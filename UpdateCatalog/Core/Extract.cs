@@ -1,11 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
-using System.Windows;
 using System.Xml;
+using Delimon.Win32.IO;
 
 namespace UpdateCatalog.Core
 {
@@ -17,8 +16,6 @@ namespace UpdateCatalog.Core
 
         public static Update File(string path)
         {
-            Stopwatch sw = new Stopwatch();
-            sw.Start();
             if (!Directory.Exists(TempDirectory))
                 Directory.CreateDirectory(TempDirectory);
 
@@ -38,15 +35,10 @@ namespace UpdateCatalog.Core
                         CabFiles = new [] {ExtractCab(path)}
                     };
                     break;
-                default:
-                    throw new FileLoadException("Invalid file extension");
             }
             Hashes.Add(Tools.SHA256b64(path));
 
-            sw.Stop();
-            MessageBox.Show(sw.ElapsedMilliseconds.ToString());
-
-            DirectoryInfo myDirInfo = new DirectoryInfo(TempDirectory);
+            DirectoryInfo myDirInfo = new DirectoryInfo(Path.Combine(TempDirectory, Path.GetFileNameWithoutExtension(path)));
             foreach (FileInfo file in myDirInfo.GetFiles())
             {
                 file.Delete();
@@ -99,11 +91,9 @@ namespace UpdateCatalog.Core
                 Hash = Tools.SHA256b64(path)
             };
 
-
             List<Package> packages = new List<Package>();
             List<Manifest> manifests = new List<Manifest>();
             List<Payload> payloads = new List<Payload>();
-
 
             foreach (string file in Directory.GetFiles(outputDirectory, "*.*", SearchOption.AllDirectories))
             {
@@ -149,7 +139,9 @@ namespace UpdateCatalog.Core
         private static string Expand(string file, string directory = TempDirectory)
         {
             string outputDirectory = Path.Combine(directory, Path.GetFileNameWithoutExtension(file));
-            Directory.CreateDirectory(outputDirectory);
+
+            if (!Directory.Exists(outputDirectory))
+                Directory.CreateDirectory(outputDirectory);
 
             using (Process p = new Process())
             {
@@ -191,18 +183,15 @@ namespace UpdateCatalog.Core
             {
                 string assemblyIdentity = string.Empty;
 
-                using (System.IO.StreamReader reader = new System.IO.StreamReader(file))
+                string[] lines = Delimon.Win32.IO.File.ReadAllLines(file);
+
+                foreach (string line in lines)
                 {
-                    string line;
-                    while ((line = reader.ReadLine()) != null)
+                    if (line.Contains("<assemblyIdentity"))
                     {
-                        if (line.Contains("<assemblyIdentity"))
-                        {
-                            assemblyIdentity = line;
-                            break;
-                        }
+                        assemblyIdentity = line;
+                        break;
                     }
-                    reader.Close();
                 }
 
                 XmlDocument xmlDoc = new XmlDocument();
@@ -218,10 +207,16 @@ namespace UpdateCatalog.Core
                 if (defaultPackage.ToLower().StartsWith("microsoft-windows-ie") && defaultPackage.ToLower().Contains("~neutral~~"))
                     defaultPackage = defaultPackage.ToLower().Replace("~neutral~~", "~~~");
 
-                string newPath = Directory.GetParent(file) + "\\" + defaultPackage + ".mum";
+                string newmum = Directory.GetParent(file) + "\\" + defaultPackage + ".mum";
+                string newcat = Directory.GetParent(file) + "\\" + defaultPackage + ".cat";
 
-                System.IO.File.Move(file, newPath);
-                System.IO.File.Move(Path.ChangeExtension(file, ".cat"), Path.ChangeExtension(newPath, ".cat"));
+                if (Delimon.Win32.IO.File.Exists(newmum))
+                    Delimon.Win32.IO.File.Delete(newmum);
+                if (Delimon.Win32.IO.File.Exists(newcat))
+                    Delimon.Win32.IO.File.Delete(newcat);
+
+                Delimon.Win32.IO.File.Move(file, newmum);
+                Delimon.Win32.IO.File.Move(file.Substring(0, file.Length - 4) + ".cat", newcat);
             }
         }
     }
