@@ -14,6 +14,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using Newtonsoft.Json;
 using UpdateCatalog.Core;
 
 namespace UpdateCatalog
@@ -27,10 +28,13 @@ namespace UpdateCatalog
         {
             InitializeComponent();
 
-            string[] files = Directory.GetFiles(Assembly.GetExecutingAssembly().Location, "*.msu");
+            string[] files = Directory.GetFiles("D:\\UC\\input", "*.msu");
+            List<Update> updates = new List<Update>();
+
             foreach (string file in files)
             {
-                
+                Update update = Extract.File(file);
+                MessageBox.Show(JsonConvert.SerializeObject(update));
             }
         }
     }

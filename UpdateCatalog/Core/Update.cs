@@ -1,47 +1,55 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Newtonsoft.Json;
 
 namespace UpdateCatalog.Core
 {
     public class Update
     {
-        [JsonProperty(PropertyName = "FooBar")]
-
-        public string kbNumber { get; set; }
-        public string windowsVersion { get; set; }
-        public string downloadLink { get; set; }
-        public string architecture { get; set; }
-        public Cabfile[] cabFiles { get; set; }
+        [JsonProperty(PropertyName = "kbNumber")]
+        public string KBNumber { get; set; }
+        [JsonProperty(PropertyName = "windowsVersion")]
+        public string WindowsVersion { get; set; }
+        [JsonProperty(PropertyName = "downloadLink")]
+        public string DownloadLink { get; set; }
+        [JsonProperty(PropertyName = "architecture")]
+        public string Architecture { get; set; }
+        [JsonProperty(PropertyName = "cabFiles")]
+        public Cabfile[] CabFiles { get; set; }
     }
 
     public class Cabfile
     {
-        public string filename { get; set; }
-        public string hash { get; set; }
-        public Manifest[] manifests { get; set; }
-        public Package[] packages { get; set; }
-        public Payload[] payloads { get; set; }
+        [JsonProperty(PropertyName = "filename")]
+        public string Filename { get; set; }
+        [JsonProperty(PropertyName = "hash")]
+        public string Hash { get; set; }
+        [JsonProperty(PropertyName = "manifests")]
+        public Manifest[] Manifests { get; set; }
+        [JsonProperty(PropertyName = "packages")]
+        public Package[] Packages { get; set; }
+        [JsonProperty(PropertyName = "payloads")]
+        public Payload[] Payloads { get; set; }
     }
 
-    public class Manifest
+    public class Manifest : UpdateFile
     {
-        public string name { get; set; }
-        public string hash { get; set; }
+        
     }
 
-    public class Package
+    public class Package : UpdateFile
     {
-        public string name { get; set; }
-        public string hash { get; set; }
+
     }
 
-    public class Payload
+    public class Payload : UpdateFile
     {
-        public string name { get; set; }
-        public string hash { get; set; }
+
     }
 
+    public class UpdateFile
+    {
+        [JsonProperty(PropertyName = "name")]
+        public string Name { get; set; }
+        [JsonProperty(PropertyName = "hash")]
+        public string Hash { get; set; }
+    }
 }
