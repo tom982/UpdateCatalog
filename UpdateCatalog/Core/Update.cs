@@ -8,6 +8,8 @@ namespace UpdateCatalog.Core
         public string KBNumber { get; set; }
         [JsonProperty(PropertyName = "windowsVersion")]
         public string WindowsVersion { get; set; }
+        [JsonProperty(PropertyName = "version")]
+        public string Version { get; set; }
         [JsonProperty(PropertyName = "downloadLink")]
         public string DownloadLink { get; set; }
         [JsonProperty(PropertyName = "architecture")]
@@ -30,22 +32,23 @@ namespace UpdateCatalog.Core
         public Payload[] Payloads { get; set; }
     }
 
-    public class Manifest : UpdateFile
+    public class Manifest
     {
-        
+        [JsonProperty(PropertyName = "name")]
+        public string Name { get; set; }
+        [JsonProperty(PropertyName = "hash")]
+        public string Hash { get; set; }
     }
 
-    public class Package : UpdateFile
+    public class Package
     {
-
+        [JsonProperty(PropertyName = "name")]
+        public string Name { get; set; }
+        [JsonProperty(PropertyName = "hash")]
+        public string Hash { get; set; }
     }
 
-    public class Payload : UpdateFile
-    {
-
-    }
-
-    public class UpdateFile
+    public class Payload
     {
         [JsonProperty(PropertyName = "name")]
         public string Name { get; set; }

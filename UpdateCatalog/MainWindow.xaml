@@ -6,7 +6,12 @@
         xmlns:local="clr-namespace:UpdateCatalog"
         mc:Ignorable="d"
         Title="UpdateCatalog" Height="350" Width="525">
-    <Grid>
-        
+    <Grid Background="#292c3b">
+        <Label x:Name="lblTimer" FontSize="14" Margin="10,10,0,0" Height="25" Width="313" VerticalAlignment="Top" HorizontalAlignment="Left" />
+        <Label x:Name="lblCount" Content="" FontSize="14" Margin="10,92,0,0" Height="25" Width="313" VerticalAlignment="Top" HorizontalAlignment="Left" />
+        <Label x:Name="lblStatus" Content="" FontSize="14" Margin="10,136,0,0" Height="25" Width="313" VerticalAlignment="Top" HorizontalAlignment="Left"/>
+        <Button Content="Button" HorizontalAlignment="Left" Margin="362,31,0,0" VerticalAlignment="Top" Width="99" Click="Button_Click" Height="33"/>
+        <ProgressBar x:Name="pbar" HorizontalAlignment="Left" Height="25" Margin="10,148,0,0" VerticalAlignment="Top" Width="497"/>
+        <Label x:Name="lblETA" Content="" FontSize="14" Margin="10,40,0,0" Height="25" Width="313" VerticalAlignment="Top" HorizontalAlignment="Left" />
     </Grid>
 </Window>

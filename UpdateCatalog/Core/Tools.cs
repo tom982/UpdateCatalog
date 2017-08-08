@@ -1,18 +1,25 @@
 ﻿using System;
+using System.Net;
 using System.Security.Cryptography;
 using Delimon.Win32.IO;
 
 namespace UpdateCatalog.Core
 {
-    static class Tools
+    internal static class Tools
     {
         public static string SHA256b64(string path)
         {
             if (path == null)
                 throw new NullReferenceException();
+            if (Path.GetFileName(path).ToLower() == "wsusscan.cab")
+                return "";
 
-            byte[] bytes = SHA256.Create().ComputeHash(File.ReadAllBytes(path));
-            return Convert.ToBase64String(bytes);
+            using (SHA256 sha = SHA256.Create())
+            {
+                byte[] bytes = File.ReadAllBytes(path);
+                bytes = sha.ComputeHash(bytes);
+                return Convert.ToBase64String(bytes);
+            }
         }
     }
 }

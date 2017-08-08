@@ -8,12 +8,21 @@ using Delimon.Win32.IO;
 
 namespace UpdateCatalog.Core
 {
-    static class Extract
+    internal static class Extract
     {
-        private const string TempDirectory = "D:\\UC\\Temp";
-        private static readonly string ExpandPath = Environment.GetFolderPath(Environment.SpecialFolder.Windows) + "\\system32\\expand.exe";
-        private static readonly List<string> Hashes = LoadHashes();
+        /// <summary>Directory where updates will be extracted to</summary>
+        private const string TempDirectory = @"D:\Libraries\Software\wsusoffline\client\w61-x64\glb\temp"; // TODO: Variable
 
+        private const string rgxFilename = @"windows(?<windowsVersion>\\d+\\.\\d|8-RT|Blue)-(?<kbNumber>KB\\d+)(?<version>-v\\d+)?-(?<architecture>x64|x86|ia64|arm).*\\.(?<filetype>msu|cab)";
+
+        /// <summary>Filepath of expand.exe</summary>
+        private static readonly string ExpandPath = Environment.GetFolderPath(Environment.SpecialFolder.Windows) + "\\system32\\expand.exe";
+
+        /// <summary>List of already processed file hashes</summary>
+        private static readonly List<string> Hashes = LoadHashes(); // TODO: Save hashes
+
+        /// <summary> Processes an update file (.msu/.cab) into an Update object </summary>
+        /// <param name="path">Path of update file to process</param>
         public static Update File(string path)
         {
             if (!Directory.Exists(TempDirectory))
@@ -30,12 +39,11 @@ namespace UpdateCatalog.Core
                     output = ExtractMsu(path);
                     break;
                 case ".cab":
-                    output = new Update
-                    {
-                        CabFiles = new [] {ExtractCab(path)}
-                    };
+                    output = ExtractCab(path);
                     break;
+                    // TODO: Add exe support
             }
+
             Hashes.Add(Tools.SHA256b64(path));
 
             DirectoryInfo myDirInfo = new DirectoryInfo(Path.Combine(TempDirectory, Path.GetFileNameWithoutExtension(path)));
@@ -43,20 +51,33 @@ namespace UpdateCatalog.Core
             {
                 file.Delete();
             }
+
             foreach (DirectoryInfo dir in myDirInfo.GetDirectories())
             {
                 dir.Delete(true);
             }
-            
+
             return output;
         }
 
         private static Update ExtractMsu(string path)
         {
+            // Extract file to folder
             string outputDirectory = Expand(path);
-            string architecture = path.ToLower().Contains("-x64") ? "x64" : "x86";
-            string version = Regex.Match(path, "(\\d+\\.\\d+)").Value;
-            string kb = GetKBNumber(path);
+            
+            // Detect update details
+            string filename = Path.GetFileName(path);
+            Regex rgx = new Regex(rgxFilename, RegexOptions.IgnoreCase);
+
+            GroupCollection groups = rgx.Match(filename).Groups;
+
+            string architecture = groups["architecture"].Value;
+            string windowsVersion = groups["windowsVersion"].Value.ToUpper().Replace("BLUE", "8.1");
+            string kb = groups["kbNumber"].Value;
+            string version = groups["version"].Value.ToLower().Replace("-v", "") == "" ? "1" : groups["version"].Value.ToLower().Replace("-v", "");
+
+            if (kb == null)
+                throw new NullReferenceException("KB number is null. My code sucks");
 
             Update output = new Update
             {
@@ -64,7 +85,8 @@ namespace UpdateCatalog.Core
                 Architecture = architecture,
                 CabFiles = null,
                 KBNumber = kb,
-                WindowsVersion = version
+                Version = version,
+                WindowsVersion = windowsVersion
             };
 
             List<Cabfile> cabfiles = new List<Cabfile>();
@@ -72,7 +94,7 @@ namespace UpdateCatalog.Core
             foreach (string cabfile in Directory.GetFiles(outputDirectory, "*.cab", SearchOption.TopDirectoryOnly))
             {
                 if (cabfile.ToLower().Contains("wsusscan.cab")) continue;
-                cabfiles.Add(ExtractCab(cabfile, outputDirectory));
+                cabfiles.Add(ExpandCab(cabfile, outputDirectory));
             }
 
             output.CabFiles = cabfiles.ToArray();
@@ -80,7 +102,35 @@ namespace UpdateCatalog.Core
             return output;
         }
 
-        private static Cabfile ExtractCab(string path, string directory = TempDirectory)
+        private static Update ExtractCab(string path)
+        {
+            string filename = Path.GetFileName(path);
+            Regex rgx = new Regex(rgxFilename, RegexOptions.IgnoreCase);
+
+            GroupCollection groups = rgx.Match(filename).Groups;
+
+            string architecture = groups["architecture"].Value;
+            string windowsVersion = groups["windowsVersion"].Value.ToUpper().Replace("BLUE", "8.1");
+            string kb = groups["kbNumber"].Value;
+            string version = groups["version"].Value.ToLower().Replace("-v", "") == "" ? "1" : groups["version"].Value.ToLower().Replace("-v", "");
+
+            if (kb == null)
+                throw new NullReferenceException("KB number is null. My code sucks");
+
+            Update output = new Update
+            {
+                DownloadLink = "",
+                Architecture = architecture,
+                KBNumber = kb,
+                Version = version,
+                WindowsVersion = windowsVersion,
+                CabFiles = new[] {ExpandCab(path)}
+            };
+
+            return output;
+        }
+
+        private static Cabfile ExpandCab(string path, string directory = TempDirectory)
         {
             string outputDirectory = Expand(path, directory);
             RenameDefaults(outputDirectory);
@@ -121,7 +171,8 @@ namespace UpdateCatalog.Core
                         });
                         break;
                     default:
-                        payloads.Add(new Payload { 
+                        payloads.Add(new Payload
+                        { 
                             Name = Path.GetFileName(Path.GetDirectoryName(file)) + "\\" + Path.GetFileName(file),
                             Hash = Tools.SHA256b64(file)
                         });
@@ -151,7 +202,7 @@ namespace UpdateCatalog.Core
                     Arguments = $" -f:* \"{file}\" \"{outputDirectory}\"",
                     CreateNoWindow = true,
                     UseShellExecute = false
-                }; ;
+                };
 
                 p.Start();
                 p.WaitForExit();
@@ -162,15 +213,8 @@ namespace UpdateCatalog.Core
 
         private static List<string> LoadHashes()
         {
+            // TODO: Load hashes from settings
             return new List<string>();
-        }
-
-        private static string GetKBNumber(string path)
-        {
-            Regex rgx = new Regex(@"KB\d+", RegexOptions.IgnoreCase);
-            return rgx.Matches(path).Count > 0
-                ? rgx.Matches(path)[0].ToString().ToUpper()
-                : null;
         }
 
         private static void RenameDefaults(string path)
