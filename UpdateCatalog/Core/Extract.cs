@@ -10,10 +10,7 @@ namespace UpdateCatalog.Core
 {
     internal static class Extract
     {
-        /// <summary>Directory where updates will be extracted to</summary>
-        private const string TempDirectory = @"D:\Libraries\Software\wsusoffline\client\w61-x64\glb\temp"; // TODO: Variable
-
-        private const string rgxFilename = @"windows(?<windowsVersion>\\d+\\.\\d|8-RT|Blue)-(?<kbNumber>KB\\d+)(?<version>-v\\d+)?-(?<architecture>x64|x86|ia64|arm).*\\.(?<filetype>msu|cab)";
+        private const string rgxFilename = @"windows(?<windowsVersion>\d+\.\d|8-RT|Blue)-(?<kbNumber>KB\d+)(?<version>-v\d+)?-(?<architecture>x64|x86|ia64|arm).*\.(?<filetype>msu|cab)";
 
         /// <summary>Filepath of expand.exe</summary>
         private static readonly string ExpandPath = Environment.GetFolderPath(Environment.SpecialFolder.Windows) + "\\system32\\expand.exe";
@@ -25,8 +22,8 @@ namespace UpdateCatalog.Core
         /// <param name="path">Path of update file to process</param>
         public static Update File(string path)
         {
-            if (!Directory.Exists(TempDirectory))
-                Directory.CreateDirectory(TempDirectory);
+            if (!Directory.Exists(MainWindow.TempDirectory))
+                Directory.CreateDirectory(MainWindow.TempDirectory);
 
             if (Hashes.Contains(Tools.SHA256b64(path)))
                 return null;
@@ -46,7 +43,7 @@ namespace UpdateCatalog.Core
 
             Hashes.Add(Tools.SHA256b64(path));
 
-            DirectoryInfo myDirInfo = new DirectoryInfo(Path.Combine(TempDirectory, Path.GetFileNameWithoutExtension(path)));
+            DirectoryInfo myDirInfo = new DirectoryInfo(Path.Combine(MainWindow.TempDirectory, Path.GetFileNameWithoutExtension(path)));
             foreach (FileInfo file in myDirInfo.GetFiles())
             {
                 file.Delete();
@@ -63,7 +60,7 @@ namespace UpdateCatalog.Core
         private static Update ExtractMsu(string path)
         {
             // Extract file to folder
-            string outputDirectory = Expand(path);
+            string outputDirectory = Expand(path, MainWindow.TempDirectory);
             
             // Detect update details
             string filename = Path.GetFileName(path);
@@ -124,13 +121,13 @@ namespace UpdateCatalog.Core
                 KBNumber = kb,
                 Version = version,
                 WindowsVersion = windowsVersion,
-                CabFiles = new[] {ExpandCab(path)}
+                CabFiles = new[] {ExpandCab(path, MainWindow.TempDirectory) }
             };
 
             return output;
         }
 
-        private static Cabfile ExpandCab(string path, string directory = TempDirectory)
+        private static Cabfile ExpandCab(string path, string directory)
         {
             string outputDirectory = Expand(path, directory);
             RenameDefaults(outputDirectory);
@@ -187,7 +184,7 @@ namespace UpdateCatalog.Core
             return output;
         }
 
-        private static string Expand(string file, string directory = TempDirectory)
+        public static string Expand(string file, string directory, string filename = "*")
         {
             string outputDirectory = Path.Combine(directory, Path.GetFileNameWithoutExtension(file));
 
@@ -199,7 +196,7 @@ namespace UpdateCatalog.Core
                 p.StartInfo = new ProcessStartInfo
                 {
                     FileName = ExpandPath,
-                    Arguments = $" -f:* \"{file}\" \"{outputDirectory}\"",
+                    Arguments = $" -f:{filename} \"{file}\" \"{outputDirectory}\"",
                     CreateNoWindow = true,
                     UseShellExecute = false
                 };

@@ -5,13 +5,45 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:UpdateCatalog"
         mc:Ignorable="d"
-        Title="UpdateCatalog" Height="350" Width="525">
+        Title="UpdateCatalog" Height="274.6" Width="538">
     <Grid Background="#292c3b">
-        <Label x:Name="lblTimer" FontSize="14" Margin="10,10,0,0" Height="25" Width="313" VerticalAlignment="Top" HorizontalAlignment="Left" />
-        <Label x:Name="lblCount" Content="" FontSize="14" Margin="10,92,0,0" Height="25" Width="313" VerticalAlignment="Top" HorizontalAlignment="Left" />
-        <Label x:Name="lblStatus" Content="" FontSize="14" Margin="10,136,0,0" Height="25" Width="313" VerticalAlignment="Top" HorizontalAlignment="Left"/>
-        <Button Content="Button" HorizontalAlignment="Left" Margin="362,31,0,0" VerticalAlignment="Top" Width="99" Click="Button_Click" Height="33"/>
-        <ProgressBar x:Name="pbar" HorizontalAlignment="Left" Height="25" Margin="10,148,0,0" VerticalAlignment="Top" Width="497"/>
-        <Label x:Name="lblETA" Content="" FontSize="14" Margin="10,40,0,0" Height="25" Width="313" VerticalAlignment="Top" HorizontalAlignment="Left" />
+        <TabControl Background="Transparent" Margin="0,0,0,0">
+            <TabItem Header="Scanner">
+                <Grid>
+                    <Label Content="Elapsed" Foreground="#aaabb0" Height="28" VerticalAlignment="Top" HorizontalAlignment="Left" Width="80" Margin="10,8,0,0"></Label>
+                    <Label x:Name="lblTimer" Style="{StaticResource BackgroundLabel}" FontSize="14" Margin="98,8,0,0" Height="28" Width="313" VerticalAlignment="Top" HorizontalAlignment="Left" />
+                    <Label Content="Scanned" Foreground="#aaabb0" Height="28" VerticalAlignment="Top" HorizontalAlignment="Left" Width="80" Margin="10,42,0,0"></Label>
+                    <Label x:Name="lblCount" Style="{StaticResource BackgroundLabel}" Content="" FontSize="14" Margin="98,42,0,0" Height="28" Width="313" VerticalAlignment="Top" HorizontalAlignment="Left" />
+                    <Label Content="ETA" Foreground="#aaabb0" Height="28" VerticalAlignment="Top" HorizontalAlignment="Left" Width="80" Margin="10,74,0,0"/>
+                    <Label x:Name="lblStatus" Style="{StaticResource BackgroundLabel}" Content="" FontSize="14" Margin="98,108,0,0" Height="28" Width="313" VerticalAlignment="Top" HorizontalAlignment="Left" />
+                    <Label Content="Processing" Foreground="#aaabb0" Height="28" VerticalAlignment="Top" HorizontalAlignment="Left" Width="80" Margin="10,108,0,0"/>
+                    <Label x:Name="lblETA" Style="{StaticResource BackgroundLabel}" Content="" FontSize="14" Margin="98,74,0,0" Height="28" Width="313" VerticalAlignment="Top" HorizontalAlignment="Left"/>
+
+                    <Button x:Name="btnRun" Content="Run" HorizontalAlignment="Left" Margin="428,8,0,0" VerticalAlignment="Top" Width="79" Click="BtnRun_OnClick"  Height="34"/>
+                    <Button x:Name="btnCancel" Content="Cancel" HorizontalAlignment="Left" Margin="428,46,0,0" VerticalAlignment="Top" Width="79" Click="BtnCancel_OnClick" Height="34"/>
+
+                    <ProgressBar x:Name="pbar" HorizontalAlignment="Left" Height="25" Margin="16,141,0,0" VerticalAlignment="Top" Width="491"/>
+                </Grid>
+            </TabItem>
+            <TabItem Header="Links">
+                <Grid>
+                    <ScrollViewer>
+                        <Grid>
+                            <Label Content="Link Count" Foreground="#aaabb0" Height="28" VerticalAlignment="Top" HorizontalContentAlignment="Center" HorizontalAlignment="Left" Width="80" Margin="155,0,0,0"/>
+                            <Label Content="Last Updated" Foreground="#aaabb0" Height="28" VerticalAlignment="Top" HorizontalContentAlignment="Center" HorizontalAlignment="Left" Width="80" Margin="333,0,0,0"/>
+
+                            <Label Content="wsusscn2.cab" Foreground="#aaabb0" Height="28" VerticalAlignment="Top" HorizontalAlignment="Left" Width="80" Margin="10,28,0,0"></Label>
+                            <Label x:Name="lblWsusscn2Count" Style="{StaticResource BackgroundLabel}" FontSize="14" Margin="98,28,0,0" Height="28" Width="180" VerticalAlignment="Top" HorizontalAlignment="Left" />
+                            <Label x:Name="lblWsusscn2Date" Style="{StaticResource BackgroundLabel}" FontSize="14" Margin="283,28,0,0" Height="28" Width="180" VerticalAlignment="Top" HorizontalAlignment="Left" />
+                            <Label x:Name="lblLinkStatus" Style="{StaticResource BackgroundLabel}" FontSize="14" Margin="16,108,0,0" Height="28" Width="479" VerticalAlignment="Top" HorizontalAlignment="Left" />
+                            <ProgressBar x:Name="pbarlinks" HorizontalAlignment="Left" Height="25" Margin="16,141,0,0" VerticalAlignment="Top" Width="479"/>
+
+                        </Grid>
+                    </ScrollViewer>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+
     </Grid>
 </Window>

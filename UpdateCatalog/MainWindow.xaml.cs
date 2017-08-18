@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -21,17 +23,101 @@ namespace UpdateCatalog
         private Stopwatch _sw2;
         private static volatile int _volatileCounter;
         private int _total;
+        private readonly CancellationTokenSource _cts = new CancellationTokenSource();
+
+        public static string BaseDirectory;
+        public static string TempDirectory;
+        public static string LinksDirectory;
 
         public MainWindow()
         {
             InitializeComponent();
+
+            LoadSettings();
+
+            LoadLinks();
+            
+            // TODO: Download wsus
+            // TODO: Extract cab with expand
+            // TODO: Extract package.cab with expand
+            // TODO: Read links from package.xml with regex
         }
+
+        private void LoadSettings()
+        {
+            BaseDirectory = Path.GetTempPath() + "UpdateCatalog";
+            TempDirectory = BaseDirectory + "\\Temp";
+            LinksDirectory = BaseDirectory + "\\Links";
+
+            if (!Directory.Exists(BaseDirectory))
+                Directory.CreateDirectory(BaseDirectory);
+            if (!Directory.Exists(TempDirectory))
+                Directory.CreateDirectory(TempDirectory);
+            if (!Directory.Exists(LinksDirectory))
+                Directory.CreateDirectory(LinksDirectory);
+        }
+
+        private async void LoadLinks()
+        {
+            // Wsus
+            if (!File.Exists(LinksDirectory + "\\wsusscn2.cab") || new FileInfo(LinksDirectory + "\\wsusscn2.cab").Length < 200000000)
+            {
+                using (WebClient wc = new WebClient())
+                {
+                    wc.DownloadProgressChanged += client_DownloadProgressChanged;
+                    wc.DownloadFileCompleted += client_DownloadFileCompleted;
+
+                    await wc.DownloadFileTaskAsync(new Uri(Urls.Wsus), LinksDirectory + "\\wsusscn2.cab");
+                }
+            }
+
+            Dispatcher.Invoke(() =>
+            {
+                lblLinkStatus.Content = "Extracting: wsusscn2.cab";
+            });
+
+            Extract.Expand(LinksDirectory + "\\wsusscn2.cab", LinksDirectory, "package.cab");
+
+            Dispatcher.Invoke(() =>
+            {
+                lblLinkStatus.Content = "Processing: wsusscn2.cab";
+            });
+
+            if (!Directory.Exists(LinksDirectory + "\\wsusscn2"))
+                Directory.CreateDirectory(LinksDirectory + "\\wsusscn2");
+
+            Extract.Expand(LinksDirectory + "\\wsusscn2\\package.cab", LinksDirectory + "\\wsusscn2");
+
+            // WHD
+
+
+            // WUD
+
+
+        }
+
+        void client_DownloadProgressChanged(object sender, DownloadProgressChangedEventArgs e)
+        {
+            double bytesIn = double.Parse(e.BytesReceived.ToString());
+            double totalBytes = double.Parse(e.TotalBytesToReceive.ToString());
+            double percentage = bytesIn / totalBytes * 100;
+            pbarlinks.Value = int.Parse(Math.Truncate(percentage).ToString());
+        }
+
+        void client_DownloadFileCompleted(object sender, AsyncCompletedEventArgs e)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                lblLinkStatus.Content = "Downloading: wsusscn2.cab";
+            });
+        }
+
 
         private async void Process()
         {
             await Task.Run(() =>
             {
-                string directory = @"D:\Libraries\Software\wsusoffline\client\w61-x64\glb\input";
+                string directory = @"D:\Libraries\Software\wsusoffline\client\w61-x64\glb";
                 string[] msuFiles = Directory.GetFiles(directory, "*.msu", SearchOption.AllDirectories);
                 string[] cabFiles = Directory.GetFiles(directory, "*.cab", SearchOption.AllDirectories);
                 string[] files = msuFiles.Concat(cabFiles).ToArray();
@@ -48,30 +134,49 @@ namespace UpdateCatalog
 
                 sw.Start();
 
-                Parallel.ForEach(files, new ParallelOptions { MaxDegreeOfParallelism = 4 }, file =>
+                ParallelOptions po = new ParallelOptions
                 {
-                    Update update = Extract.File(file);
-                    updates.Add(update);
+                    MaxDegreeOfParallelism = 4,
+                    CancellationToken = _cts.Token
+                };
 
-                    if (string.IsNullOrEmpty(update.Architecture) || string.IsNullOrEmpty(update.KBNumber) || string.IsNullOrEmpty(update.WindowsVersion) || string.IsNullOrEmpty(update.Version) || update.CabFiles.Length == 0)
-                        MessageBox.Show(Path.GetFileName(file) + "\r\n" + update.KBNumber + "\r\n" + update.WindowsVersion + "\r\n" + update.Architecture + "\r\n" + update.Version + "\r\n" + update.CabFiles.Length);
-                    Interlocked.Increment(ref _volatileCounter);
+                try
+                {
+                    Parallel.ForEach(files, po, file =>
+                    {
+                        Update update = Extract.File(file);
+                        updates.Add(update);
 
-                    //MessageBox.Show(Path.GetFileName(file) + "\r\n" + update.KBNumber + "\r\n" + update.WindowsVersion + "\r\n" + update.Architecture);
+                        if (string.IsNullOrEmpty(update.Architecture) || string.IsNullOrEmpty(update.KBNumber) || string.IsNullOrEmpty(update.WindowsVersion) || string.IsNullOrEmpty(update.Version) || update.CabFiles.Length == 0)
+                            MessageBox.Show(Path.GetFileName(file) + "\r\n" + update.KBNumber + "\r\n" + update.WindowsVersion + "\r\n" + update.Architecture + "\r\n" + update.Version + "\r\n" + update.CabFiles.Length);
+                        Interlocked.Increment(ref _volatileCounter);
 
-                    lblStatus.Dispatcher.Invoke(() =>
-                    {
-                        lblStatus.Content = $"{update.KBNumber.ToUpper()} (Windows {update.WindowsVersion} {update.Architecture})";
+                        if (!_cts.IsCancellationRequested)
+                        {
+                            Dispatcher.Invoke(() =>
+                            {
+                                lblStatus.Content = $"{update.KBNumber.ToUpper()} (Windows {update.WindowsVersion} {update.Architecture})";
+                            });
+                            Dispatcher.Invoke(() =>
+                            {
+                                lblCount.Content = _volatileCounter + "/" + _total;
+                            });
+                            Dispatcher.Invoke(() =>
+                            {
+                                pbar.Value = _volatileCounter;
+                            });
+                        }
                     });
-                    lblCount.Dispatcher.Invoke(() =>
-                    {
-                        lblCount.Content = _volatileCounter + "/" + _total;
-                    });
-                    pbar.Dispatcher.Invoke(() =>
-                    {
-                        pbar.Value = _volatileCounter;
-                    });
-                });
+                }
+                catch (OperationCanceledException)
+                {
+
+                }
+                finally
+                {
+                    _cts.Dispose();
+                }
+                
 
                 sw.Stop();
                 _sw2.Stop();
@@ -115,7 +220,39 @@ namespace UpdateCatalog
                 lblETA.Content = TimeSpan.FromMilliseconds((long)(_sw2.ElapsedMilliseconds * (float)_total / _volatileCounter)).ToString(@"m\:ss");
         }
 
-        private void Button_Click(object sender, RoutedEventArgs e)
+        private async void BtnCancel_OnClick(object sender, RoutedEventArgs e)
+        {
+            _cts.Cancel();
+            await Task.Run(() =>
+            {
+                while (true)
+                {
+                    Process[] processes = System.Diagnostics.Process.GetProcessesByName("expand");
+                    if (processes.Length == 0)
+                        break;
+                    Dispatcher.Invoke(() =>
+                    {
+                        lblStatus.Content = $"Waiting for {processes.Length} expand.exe instance(s) to finish";
+                    });
+                    Thread.Sleep(100);
+                }
+            });
+
+            lblStatus.Content = "Operation cancelled";
+
+            ResetWindow();
+        }
+
+        private void ResetWindow()
+        {
+            lblCount.Content = "";
+            lblETA.Content = "";
+            lblTimer.Content = "";
+            _sw2.Stop();
+            _timer.Stop();
+        }
+
+        private void BtnRun_OnClick(object sender, RoutedEventArgs e)
         {
             StartTimer();
             Process();

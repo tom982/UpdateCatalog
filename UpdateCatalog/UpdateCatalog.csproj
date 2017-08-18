@@ -74,6 +74,7 @@
     <Compile Include="Core\Extract.cs" />
     <Compile Include="Core\Tools.cs" />
     <Compile Include="Core\Update.cs" />
+    <Compile Include="Core\Urls.cs" />
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
