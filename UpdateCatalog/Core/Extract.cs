@@ -15,9 +15,6 @@ namespace UpdateCatalog.Core
         /// <summary>Filepath of expand.exe</summary>
         private static readonly string ExpandPath = Environment.GetFolderPath(Environment.SpecialFolder.Windows) + "\\system32\\expand.exe";
 
-        /// <summary>List of already processed file hashes</summary>
-        private static readonly List<string> Hashes = LoadHashes(); // TODO: Save hashes
-
         /// <summary> Processes an update file (.msu/.cab) into an Update object </summary>
         /// <param name="path">Path of update file to process</param>
         public static Update File(string path)
@@ -25,7 +22,7 @@ namespace UpdateCatalog.Core
             if (!Directory.Exists(MainWindow.TempDirectory))
                 Directory.CreateDirectory(MainWindow.TempDirectory);
 
-            if (Hashes.Contains(Tools.SHA256b64(path)))
+            if (MainWindow.Hashes.Contains(Tools.SHA256b64(path)))
                 return null;
 
             Update output = null;
@@ -41,19 +38,26 @@ namespace UpdateCatalog.Core
                     // TODO: Add exe support
             }
 
-            Hashes.Add(Tools.SHA256b64(path));
+            MainWindow.Hashes.Add(Tools.SHA256b64(path));
 
-            DirectoryInfo myDirInfo = new DirectoryInfo(Path.Combine(MainWindow.TempDirectory, Path.GetFileNameWithoutExtension(path)));
-            foreach (FileInfo file in myDirInfo.GetFiles())
+            Tools.EmptyDirectory(Path.Combine(MainWindow.TempDirectory, Path.GetFileNameWithoutExtension(path)));
+
+            if (output != null && MainWindow.DownloadLinks.ContainsKey(output.KBNumber))
             {
-                file.Delete();
+                List<Link> links = MainWindow.DownloadLinks[output.KBNumber];
+
+                foreach (Link link in links)
+                {
+                    if (output.KBNumber == link.KBNumber &&
+                        output.Architecture == link.Architecture &&
+                        output.Version == link.Version &&
+                        output.WindowsVersion == link.WindowsVersion)
+                        output.DownloadLink = link.Url;
+                }
             }
 
-            foreach (DirectoryInfo dir in myDirInfo.GetDirectories())
-            {
-                dir.Delete(true);
-            }
-
+            FileInfo fi = new FileInfo(path);
+            output.Filesize = fi.Length.ToString();
             return output;
         }
 
@@ -70,7 +74,7 @@ namespace UpdateCatalog.Core
 
             string architecture = groups["architecture"].Value;
             string windowsVersion = groups["windowsVersion"].Value.ToUpper().Replace("BLUE", "8.1");
-            string kb = groups["kbNumber"].Value;
+            string kb = groups["kbNumber"].Value.ToLower();
             string version = groups["version"].Value.ToLower().Replace("-v", "") == "" ? "1" : groups["version"].Value.ToLower().Replace("-v", "");
 
             if (kb == null)
@@ -118,7 +122,7 @@ namespace UpdateCatalog.Core
             {
                 DownloadLink = "",
                 Architecture = architecture,
-                KBNumber = kb,
+                KBNumber = kb.ToLower(),
                 Version = version,
                 WindowsVersion = windowsVersion,
                 CabFiles = new[] {ExpandCab(path, MainWindow.TempDirectory) }
@@ -135,7 +139,8 @@ namespace UpdateCatalog.Core
             Cabfile output = new Cabfile
             {
                 Filename = Path.GetFileName(path),
-                Hash = Tools.SHA256b64(path)
+                SHA1 = Tools.SHA1(path),
+                SHA256 = Tools.SHA256b64(path)
             };
 
             List<Package> packages = new List<Package>();
@@ -150,28 +155,32 @@ namespace UpdateCatalog.Core
                         packages.Add(new Package
                         {
                             Name = Path.GetFileName(file),
-                            Hash = Tools.SHA256b64(file)
+                            SHA1 = Tools.SHA1(file),
+                            SHA256 = Tools.SHA256b64(file)
                         });
                         break;
                     case ".mum":
                         packages.Add(new Package
                         {
                             Name = Path.GetFileName(file),
-                            Hash = Tools.SHA256b64(file)
+                            SHA1 = Tools.SHA1(file),
+                            SHA256 = Tools.SHA256b64(file)
                         });
                         break;
                     case ".manifest":
                         manifests.Add(new Manifest
                         {
                             Name = Path.GetFileName(file),
-                            Hash = Tools.SHA256b64(file)
+                            SHA1 = Tools.SHA1(file),
+                            SHA256 = Tools.SHA256b64(file)
                         });
                         break;
                     default:
                         payloads.Add(new Payload
                         { 
                             Name = Path.GetFileName(Path.GetDirectoryName(file)) + "\\" + Path.GetFileName(file),
-                            Hash = Tools.SHA256b64(file)
+                            SHA1 = Tools.SHA1(file),
+                            SHA256 = Tools.SHA256b64(file)
                         });
                         break;
                 }
@@ -186,6 +195,7 @@ namespace UpdateCatalog.Core
 
         public static string Expand(string file, string directory, string filename = "*")
         {
+
             string outputDirectory = Path.Combine(directory, Path.GetFileNameWithoutExtension(file));
 
             if (!Directory.Exists(outputDirectory))
@@ -196,7 +206,7 @@ namespace UpdateCatalog.Core
                 p.StartInfo = new ProcessStartInfo
                 {
                     FileName = ExpandPath,
-                    Arguments = $" -f:{filename} \"{file}\" \"{outputDirectory}\"",
+                    Arguments = $"-r -f:{filename} \"{file}\" \"{outputDirectory}\"",
                     CreateNoWindow = true,
                     UseShellExecute = false
                 };
@@ -206,12 +216,6 @@ namespace UpdateCatalog.Core
             }
 
             return outputDirectory;
-        }
-
-        private static List<string> LoadHashes()
-        {
-            // TODO: Load hashes from settings
-            return new List<string>();
         }
 
         private static void RenameDefaults(string path)
@@ -245,7 +249,7 @@ namespace UpdateCatalog.Core
                 string version = xmlDoc.SelectSingleNode("//assemblyIdentity/@version").Value;
                 string defaultPackage = name + "~" + publicKeyToken + "~" + processorArchitecture + "~~" + version;
 
-                if (defaultPackage.ToLower().StartsWith("microsoft-windows-ie") && defaultPackage.ToLower().Contains("~neutral~~"))
+                if (defaultPackage.StartsWith("microsoft-windows-ie", StringComparison.OrdinalIgnoreCase) && defaultPackage.ToLower().Contains("~neutral~~"))
                     defaultPackage = defaultPackage.ToLower().Replace("~neutral~~", "~~~");
 
                 string newmum = Directory.GetParent(file) + "\\" + defaultPackage + ".mum";

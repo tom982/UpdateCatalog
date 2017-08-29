@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Net;
 using System.Security.Cryptography;
 using Delimon.Win32.IO;
 
@@ -19,6 +18,28 @@ namespace UpdateCatalog.Core
                 byte[] bytes = File.ReadAllBytes(path);
                 bytes = sha.ComputeHash(bytes);
                 return Convert.ToBase64String(bytes);
+            }
+        }
+
+        public static string SHA1(string path)
+        {
+            using (var cryptoProvider = new SHA1CryptoServiceProvider())
+            {
+                return BitConverter.ToString(cryptoProvider.ComputeHash(File.ReadAllBytes(path))).Replace("-", "");
+            }
+        }
+
+        public static void EmptyDirectory(string path)
+        {
+            DirectoryInfo myDirInfo = new DirectoryInfo(path);
+            foreach (FileInfo file in myDirInfo.GetFiles())
+            {
+                file.Delete();
+            }
+
+            foreach (DirectoryInfo dir in myDirInfo.GetDirectories())
+            {
+                dir.Delete(true);
             }
         }
     }

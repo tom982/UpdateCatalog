@@ -4,13 +4,14 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
-using Delimon.Win32.IO;
 using Newtonsoft.Json;
 using UpdateCatalog.Core;
+using Delimon.Win32.IO;
 
 namespace UpdateCatalog
 {
@@ -28,6 +29,9 @@ namespace UpdateCatalog
         public static string BaseDirectory;
         public static string TempDirectory;
         public static string LinksDirectory;
+
+        public static readonly List<string> Hashes = new List<string>();
+        public static readonly Dictionary<string, List<Link>> DownloadLinks = new Dictionary<string, List<Link>>(); 
 
         public MainWindow()
         {
@@ -60,7 +64,7 @@ namespace UpdateCatalog
         private async void LoadLinks()
         {
             // Wsus
-            if (!File.Exists(LinksDirectory + "\\wsusscn2.cab") || new FileInfo(LinksDirectory + "\\wsusscn2.cab").Length < 200000000)
+            if (!File.Exists(LinksDirectory + "\\wsusscn2.cab"))
             {
                 using (WebClient wc = new WebClient())
                 {
@@ -87,13 +91,45 @@ namespace UpdateCatalog
                 Directory.CreateDirectory(LinksDirectory + "\\wsusscn2");
 
             Extract.Expand(LinksDirectory + "\\wsusscn2\\package.cab", LinksDirectory + "\\wsusscn2");
+            File.Copy(LinksDirectory + "\\wsusscn2\\package\\package.xml", LinksDirectory + "\\package.xml", true);
+            Tools.EmptyDirectory(LinksDirectory + "\\wsusscn2");
+            Directory.Delete(LinksDirectory + "\\wsusscn2", true);
 
+            string packageText = File.ReadAllText(LinksDirectory + "\\package.xml");
+            Regex rgx = new Regex(@"http:\/\/([a-z0-9]+[.])*(windowsupdate|microsoft)\.com\/([a-z]{1}\/msdownload\/update\/software\/[a-z]+\/\d{4}\/\d{2}|download\/[a-z0-9]{1}\/[a-z0-9]{1}\/[a-z0-9]{1}\/[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12})\/windows(?<windowsVersion>\d+\.\d|8-RT|Blue)-(?<kbNumber>KB\d+)(?<version>-v\d+)?-(?<architecture>x64|x86|ia64|arm)(-express)?([_a-z0-9]+)?.(?<filetype>msu|cab|exe)", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+            var matches = rgx.Matches(packageText);
+
+            foreach (Match match in matches)
+            {
+                string kb = match.Groups["kbNumber"].Value.ToLower();
+                string url = match.Value.ToLower();
+
+                if (!DownloadLinks.ContainsKey(kb))
+                {
+                    DownloadLinks.Add(kb, new List<Link>
+                    {
+                        new Link(url)
+                    });   
+                }
+                else
+                {
+                    List<Link> oldLinks = DownloadLinks[kb];
+                    if (!oldLinks.Select(n => n.Url).Contains(url))
+                        oldLinks.Add(new Link(url));
+                    DownloadLinks[kb] = oldLinks;
+                }
+
+            }
+
+            Dispatcher.Invoke(() =>
+            {
+                lblLinkStatus.Content = "Ready!";
+            });
             // WHD
 
 
             // WUD
-
-
         }
 
         void client_DownloadProgressChanged(object sender, DownloadProgressChangedEventArgs e)
@@ -136,7 +172,7 @@ namespace UpdateCatalog
 
                 ParallelOptions po = new ParallelOptions
                 {
-                    MaxDegreeOfParallelism = 4,
+                    MaxDegreeOfParallelism = 8,
                     CancellationToken = _cts.Token
                 };
 
@@ -145,7 +181,9 @@ namespace UpdateCatalog
                     Parallel.ForEach(files, po, file =>
                     {
                         Update update = Extract.File(file);
-                        updates.Add(update);
+
+                        if (update != null)
+                            updates.Add(update);
 
                         if (string.IsNullOrEmpty(update.Architecture) || string.IsNullOrEmpty(update.KBNumber) || string.IsNullOrEmpty(update.WindowsVersion) || string.IsNullOrEmpty(update.Version) || update.CabFiles.Length == 0)
                             MessageBox.Show(Path.GetFileName(file) + "\r\n" + update.KBNumber + "\r\n" + update.WindowsVersion + "\r\n" + update.Architecture + "\r\n" + update.Version + "\r\n" + update.CabFiles.Length);
@@ -256,6 +294,9 @@ namespace UpdateCatalog
         {
             StartTimer();
             Process();
+            if (File.Exists(BaseDirectory + "\\hashes.txt"))
+                File.Delete(BaseDirectory + "\\hashes.txt");
+            File.WriteAllLines(BaseDirectory + "\\hashes.txt", Hashes.ToArray());
         }
     }
 }

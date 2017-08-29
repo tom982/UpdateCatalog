@@ -6,8 +6,8 @@ using System.Threading.Tasks;
 
 namespace UpdateCatalog.Core
 {
-    class Urls
+    internal static class Urls
     {
-        public static string Wsus => @"http://download.windowsupdate.com/microsoftupdate/v6/wsusscan/wsusscn2.cab";
+        public const string Wsus = @"http://download.windowsupdate.com/microsoftupdate/v6/wsusscan/wsusscn2.cab";
     }
 }
